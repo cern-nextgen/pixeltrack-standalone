@@ -6,7 +6,7 @@ from pathlib import Path
 from MojoSerial.Bin.EventProcessor import EventProcessor
 from MojoSerial.Bin.PosixClockGettime import (
     PosixClockGettime,
-    CLOCK_PROCESS_CPUTIME_ID,
+    CLOCK_THREAD_CPUTIME_ID,
 )
 from MojoSerial.MojoBridge.DTypes import Double
 from algorithm.functional import parallelize
@@ -96,7 +96,23 @@ fn main() raises:
     print(", with ", threads, " concurrent events and ", threads, " threads.", sep="")
 
 
-    var block_size = maxEvents // threads if maxEvents > 0 else -1
+    var startEvent = List[Int](length=threads, fill=0)
+    var endEvent = List[Int](length=threads, fill=0)
+
+    if maxEvents > 0:
+        var base = maxEvents // threads
+        var rem = maxEvents % threads
+
+        var offset = 0
+        for t in range(threads):
+            var count = base + (1 if t < rem else 0)
+            startEvent[t] = offset
+            endEvent[t] = offset + count
+            offset += count
+    else:
+        for t in range(threads):
+            startEvent[t] = 0
+            endEvent[t] = -1
 
     var start = List[UInt](length=threads, fill=0)
     var end = List[UInt](length=threads, fill=0)
@@ -117,7 +133,8 @@ fn main() raises:
 
         var processor = EventProcessor(
             warmupEvents,
-            block_size,
+            startEvent[i],
+            endEvent[i],
             runForMinutes,
             path,
             False,
@@ -127,10 +144,10 @@ fn main() raises:
 
         processor.warmUp()
         start[i] = perf_counter_ns()
-        cpu_start[i] = PosixClockGettime[CLOCK_PROCESS_CPUTIME_ID].now()
+        cpu_start[i] = PosixClockGettime[CLOCK_THREAD_CPUTIME_ID].now()
         processor.runToCompletion()
         end[i] = perf_counter_ns()
-        cpu_end[i] = PosixClockGettime[CLOCK_PROCESS_CPUTIME_ID].now()
+        cpu_end[i] = PosixClockGettime[CLOCK_THREAD_CPUTIME_ID].now()
         processor.endJob()
 
         # Lifetime registry extension
@@ -152,11 +169,11 @@ fn main() raises:
     # in seconds
     var time: Double = diff / (10**9)
 
-    var cpu_begin = cpu_start[0]
-    var cpu_stop = cpu_end[0]
-    for i in range(threads):
-        cpu_begin = min(cpu_begin, cpu_start[i])
-        cpu_stop = max(cpu_stop, cpu_end[i])
+    var cpu_begin = cpu_start[0]/threads
+    var cpu_stop = cpu_end[0]/threads
+    for i in range(1, threads):
+        cpu_begin = cpu_begin + cpu_start[i]/threads
+        cpu_stop = cpu_stop + cpu_end[i]/threads
 
     var cpu_diff = cpu_stop - cpu_begin
     var cpu: Double = cpu_diff / (10**9)

@@ -22,7 +22,8 @@ fn readRaw(mut file: FileHandle, nfeds: UInt32) raises -> FEDRawDataCollection:
 
 
 struct Source(Defaultable, Movable, Typeable):
-    var _maxEvents: Int32
+    var _startEvent: Int32
+    var _endEvent: Int32
 
     var _runForMinutes: Int32
     var _startTime: UInt
@@ -43,7 +44,8 @@ struct Source(Defaultable, Movable, Typeable):
 
     @always_inline
     fn __init__(out self):
-        self._maxEvents = 0
+        self._startEvent = 0
+        self._endEvent = 0
 
         self._runForMinutes = 0
         self._startTime = 0
@@ -63,14 +65,16 @@ struct Source(Defaultable, Movable, Typeable):
 
     fn __init__(
         out self,
-        var maxEvents: Int32,
+        var startEvent: Int32,
+        var endEvent: Int32,
         var runForMinutes: Int32,
         mut reg: ProductRegistry,
         var path: Path,
         var validation: Bool,
     ):
         try:
-            self._maxEvents = maxEvents
+            self._startEvent = Int32(startEvent)
+            self._endEvent = Int32(endEvent)
 
             self._runForMinutes = runForMinutes
             self._startTime = 0
@@ -134,15 +138,14 @@ struct Source(Defaultable, Movable, Typeable):
                 debug_assert(self._raw.__len__() == self._tracks.__len__())
                 debug_assert(self._raw.__len__() == self._vertices.__len__())
 
-            if self._runForMinutes < 0 and self._maxEvents < 0:
-                self._maxEvents = self._raw.__len__()
         except e:
             print("Error occurred in Bin/Source.mojo,", e)
             return Self()
 
     @always_inline
     fn __moveinit__(out self, var other: Self):
-        self._maxEvents = other._maxEvents
+        self._startEvent = other._startEvent
+        self._endEvent = other._endEvent
 
         self._runForMinutes = other._runForMinutes
         self._startTime = other._startTime
@@ -161,8 +164,14 @@ struct Source(Defaultable, Movable, Typeable):
         self._validation = other._validation
 
     @always_inline
-    fn reconfigure(mut self, var maxEvents: Int32, var runForMinutes: Int32):
-        self._maxEvents = maxEvents
+    fn reconfigure(
+        mut self,
+        var startEvent: Int32,
+        var endEvent: Int32,
+        var runForMinutes: Int32,
+    ):
+        self._startEvent = startEvent
+        self._endEvent = endEvent
         self._runForMinutes = runForMinutes
         self._numEventsTimeLastCheck = 0
         self._shouldStop = False
@@ -172,10 +181,6 @@ struct Source(Defaultable, Movable, Typeable):
     fn startProcessing(mut self):
         if self._runForMinutes >= 0:
             self._startTime = perf_counter_ns()
-
-    @always_inline
-    fn maxEvents(self) -> Int32:
-        return self._maxEvents
 
     @always_inline
     fn processedEvents(self) -> Int32:
@@ -191,15 +196,16 @@ struct Source(Defaultable, Movable, Typeable):
         var res = UnsafePointer[Event]()
         if self._shouldStop:
             return res
+
         var old = self._numEvents
-        self._numEvents += 1
-        var iev = old + 1
+        var globalEvent = self._startEvent + old
+
         if self._runForMinutes < 0:
-            if old >= self._maxEvents:
+            if self._endEvent >= 0 and globalEvent >= self._endEvent:
                 self._shouldStop = True
-                self._numEvents -= 1
                 return res
         else:
+            self._numEvents += 1
             if (
                 self._numEvents - self._numEventsTimeLastCheck
                 > self._raw.__len__()
@@ -216,9 +222,15 @@ struct Source(Defaultable, Movable, Typeable):
             if self._shouldStop:
                 self._numEvents -= 1
                 return res
+            old = self._numEvents - 1
+            globalEvent = self._startEvent + old
 
-        var ev = Event(Int(streamId), Int(self._numEvents), reg)
-        var index = (self._numEvents - 1) % self._raw.__len__()
+        if self._runForMinutes < 0:
+            self._numEvents += 1
+
+        var iev = globalEvent + 1
+        var ev = Event(Int(streamId), Int(iev), reg)
+        var index = globalEvent % self._raw.__len__()
 
         ev.put[FEDRawDataCollection](self._rawToken, self._raw[index])
         if self._validation:
