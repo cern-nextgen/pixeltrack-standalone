@@ -58,7 +58,14 @@ struct SiPixelClustersSoA(Defaultable, Movable, Typeable):
         self.clusInModule_d = OwnedPointer(List[UInt32]())
         self.moduleId_d = OwnedPointer(List[UInt32]())
         self.clusModuleStart_d = OwnedPointer(List[UInt32]())
-        self.view_d = OwnedPointer(DeviceConstView())
+        self.view_d = OwnedPointer(
+            DeviceConstView(
+                self.moduleStart_d[].unsafe_ptr(),
+                self.clusInModule_d[].unsafe_ptr(),
+                self.moduleId_d[].unsafe_ptr(),
+                self.clusModuleStart_d[].unsafe_ptr(),
+            )
+        )
         self.nClusters_h = 0
 
     fn __init__(out self, maxClusters: SizeType):
@@ -86,12 +93,19 @@ struct SiPixelClustersSoA(Defaultable, Movable, Typeable):
         self.nClusters_h = 0
 
     fn __moveinit__(out self, var other: Self):
-        self.view_d = other.view_d^
         self.moduleStart_d = other.moduleStart_d^
         self.clusInModule_d = other.clusInModule_d^
         self.moduleId_d = other.moduleId_d^
         self.clusModuleStart_d = other.clusModuleStart_d^
         self.nClusters_h = other.nClusters_h
+        self.view_d = OwnedPointer(
+            DeviceConstView(
+                self.moduleStart_d[].unsafe_ptr(),
+                self.clusInModule_d[].unsafe_ptr(),
+                self.moduleId_d[].unsafe_ptr(),
+                self.clusModuleStart_d[].unsafe_ptr(),
+            )
+        )
 
     fn view(self) -> UnsafePointer[DeviceConstView, mut=False]:
         return self.view_d.unsafe_ptr()

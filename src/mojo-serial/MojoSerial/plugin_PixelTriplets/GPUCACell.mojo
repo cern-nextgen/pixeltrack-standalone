@@ -150,10 +150,23 @@ struct GPUCACell(Copyable, Defaultable, Movable):
         self.theInnerZ = hh.zGlobal(innerIdx)
         self.theInnerR = hh.rGlobal(innerIdx)
 
-        self.theOuterNeighbors = UnsafePointer(to=cellNeighbors[0])
-        self.theTracks = UnsafePointer(to=cellTracks[0])
+        self.theOuterNeighbors = UnsafePointer(to=self.cellNeighbors[0])
+        self.theTracks = UnsafePointer(to=self.cellTracks[0])
         assert self.outerNeighbors().empty()
         assert self.tracks().empty()
+
+    fn __moveinit__(out self, var other: Self):
+        self.theDoubletId = other.theDoubletId
+        self.theLayerPairId = other.theLayerPairId
+        self.theUsed = other.theUsed
+
+        self.theInnerZ = other.theInnerZ
+        self.theInnerR = other.theInnerR
+        self.theInnerHitId = other.theInnerHitId
+        self.theOuterHitId = other.theOuterHitId
+
+        self.theOuterNeighbors = UnsafePointer(to=self.cellNeighbors[0])
+        self.theTracks = UnsafePointer(to=self.cellTracks[0])
 
     @always_inline
     fn addOuterNeighbor(

@@ -109,6 +109,29 @@ struct SiPixelDigisSoA(Defaultable, Movable, Typeable):
         self.nModules_h = 0
         self.nDigis_h = 0
 
+    fn __moveinit__(out self, var other: Self):
+        self.xx_d = other.xx_d^
+        self.yy_d = other.yy_d^
+        self.adc_d = other.adc_d^
+        self.moduleInd_d = other.moduleInd_d^
+        self.clus_d = other.clus_d^
+
+        self.pdigi_d = other.pdigi_d^
+        self.rawIdArr_d = other.rawIdArr_d^
+
+        self.nModules_h = other.nModules_h
+        self.nDigis_h = other.nDigis_h
+
+        self.view_d = OwnedPointer(
+            DeviceConstView(
+                self.xx_d[].unsafe_ptr(),
+                self.yy_d[].unsafe_ptr(),
+                self.adc_d[].unsafe_ptr(),
+                self.moduleInd_d[].unsafe_ptr(),
+                self.clus_d[].unsafe_ptr(),
+            )
+        )
+
     @always_inline
     fn view(self) -> UnsafePointer[DeviceConstView, mut=False]:
         return self.view_d.unsafe_ptr()
