@@ -9,9 +9,7 @@ from MojoSerial.MojoBridge.DTypes import Char, Typeable, UChar
 from MojoSerial.MojoBridge.File import read_obj
 
 @fieldwise_init
-struct BeamSpotESProducer(
-    Defaultable, ESProducer, Movable, Typeable
-):
+struct BeamSpotESProducer(ESProducer):
     var _data: Path
 
     @always_inline

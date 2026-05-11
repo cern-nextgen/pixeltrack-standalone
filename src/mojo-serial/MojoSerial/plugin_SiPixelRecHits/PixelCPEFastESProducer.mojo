@@ -6,7 +6,7 @@ from MojoSerial.Framework.EventSetup import EventSetup
 from MojoSerial.MojoBridge.DTypes import Typeable
 
 
-struct PixelCPEFastESProducer(Defaultable, ESProducer, Movable, Typeable):
+struct PixelCPEFastESProducer(ESProducer):
     var _data: Path
 
     @always_inline

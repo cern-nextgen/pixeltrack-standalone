@@ -18,9 +18,7 @@ from MojoSerial.MojoBridge.File import (
 
 
 @fieldwise_init
-struct SiPixelFedCablingMapGPUWrapperESProducer(
-    Defaultable, ESProducer, Movable, Typeable
-):
+struct SiPixelFedCablingMapGPUWrapperESProducer(ESProducer):
     var _data: Path
 
     @always_inline

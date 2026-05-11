@@ -11,9 +11,7 @@ from MojoSerial.MojoBridge.File import read_simd, read_obj
 
 
 @fieldwise_init
-struct SiPixelGainCalibrationForHLTGPUESProducer(
-    Defaultable, ESProducer, Movable, Typeable
-):
+struct SiPixelGainCalibrationForHLTGPUESProducer(ESProducer):
     var _data: Path
 
     @always_inline
