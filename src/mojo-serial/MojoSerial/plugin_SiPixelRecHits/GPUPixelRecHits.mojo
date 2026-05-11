@@ -123,9 +123,9 @@ fn getHits(
                 debug_assert(cl < MaxHitsInIter)
 
                 clusParams.minRow[cl] = min(clusParams.minRow[cl], x)
-                clusParams.minRow[cl] = max(clusParams.maxRow[cl], x)
-                clusParams.minRow[cl] = min(clusParams.minCol[cl], y)
-                clusParams.minRow[cl] = max(clusParams.maxCol[cl], y)
+                clusParams.maxRow[cl] = max(clusParams.maxRow[cl], x)
+                clusParams.minCol[cl] = min(clusParams.minCol[cl], y)
+                clusParams.maxCol[cl] = max(clusParams.maxCol[cl], y)
 
             # pixmx is not available in the binary dumps
             var pixmx = max_finite[DType.uint16]()
