@@ -185,14 +185,10 @@ fn main() raises:
 
     parallelize[worker](threads, threads)
 
-    var begin = start[0]
-    var stop = end[0]
+    var diff = end[0] - start[0]
     for i in range(threads):
-        begin = min(begin, start[i])
-        stop = max(stop, end[i])
+        diff = max(diff, end[i] - start[i])
 
-    # Work done, report timing
-    var diff = stop - begin
     # in seconds
     var time: Double = diff / (10**9)
 
@@ -216,7 +212,7 @@ fn main() raises:
         time,
         " seconds, throughput ",
         (totalEvents / time),
-        " events/s, CPU usage: ",
+        " events/s, CPU usage per thread: ",
         round(cpu / time * 100),
         "%",
         sep="",
