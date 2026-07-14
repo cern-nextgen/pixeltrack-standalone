@@ -61,19 +61,15 @@ fn maxTuples() -> UInt32:
     return maxNumberOfTuples()
 
 
-@parameter
-let _MaxCellsPerHit: Int = maxCellsPerHit().cast[Int]()
+alias _MaxCellsPerHit: Int = Int(maxCellsPerHit())
 
-@parameter
-let _MaxNumberOfTuples: UInt32 = maxNumberOfTuples()
+alias _MaxNumberOfTuples: UInt32 = maxNumberOfTuples()
 
-@parameter
-let _CellNeighborsCapacity: Int = (
+alias _CellNeighborsCapacity: Int = (
     36 if not is_defined["ONLY_PHICUT"]() else 64
 )
 
-@parameter
-let _CellTracksCapacity: Int = 48 if not is_defined["ONLY_PHICUT"]() else 64
+alias _CellTracksCapacity: Int = 48 if not is_defined["ONLY_PHICUT"]() else 64
 
 alias hindex_type = UInt16
 alias tindex_type = UInt16
@@ -87,11 +83,11 @@ alias CellTracksVector = SimpleVector[CellTracks, "CellTracksVector"]
 
 alias OuterHitOfCell = VecArray[UInt32, "OuterHitOfCell", _MaxCellsPerHit]
 alias TuplesContainer = OneToManyAssoc[
-    hindex_type, _MaxNumberOfTuples, 5 * _MaxNumberOfTuples
+    DType.uint16, _MaxNumberOfTuples, 5 * _MaxNumberOfTuples
 ]
 alias HitToTuple = OneToManyAssoc[
-    tindex_type, GPUClusteringConstants.maxNumberOfHits, 4 * _MaxNumberOfTuples
+    DType.uint16, GPUClusteringConstants.maxNumberOfHits, 4 * _MaxNumberOfTuples
 ]
 alias TupleMultiplicity = OneToManyAssoc[
-    tindex_type, 8, _MaxNumberOfTuples
+    DType.uint16, 8, _MaxNumberOfTuples
 ]

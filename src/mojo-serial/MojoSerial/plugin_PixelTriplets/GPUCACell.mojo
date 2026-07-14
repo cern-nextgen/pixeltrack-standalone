@@ -1,11 +1,10 @@
-import math
+from math import sqrt
 from sys import is_defined
 
-import CAConstants
-from CirclEq import CircleEq
+from MojoSerial.plugin_PixelTriplets import CAConstants
+from MojoSerial.plugin_PixelTriplets.CirclEq import CircleEq
 from MojoSerial.CUDACore.AtomicPairCounter import AtomicPairCounter
 from MojoSerial.CUDACore.CUDACompat import CUDACompat
-from MojoSerial.CUDACore.SimpleVector import SimpleVector
 from MojoSerial.CUDACore.VecArray import VecArray
 from MojoSerial.CUDADataFormats.PixelTrackHeterogeneous import (
     PixelTrack as pixelTrack,
@@ -14,6 +13,7 @@ from MojoSerial.CUDADataFormats.PixelTrackHeterogeneous import (
 from MojoSerial.CUDADataFormats.TrackingRecHit2DSOAView import (
     TrackingRecHit2DSOAView,
 )
+
 
 @fieldwise_init
 struct GPUCACell(Copyable, Defaultable, Movable):
@@ -27,29 +27,29 @@ struct GPUCACell(Copyable, Defaultable, Movable):
     alias CellTracksVector = CAConstants.CellTracksVector
 
     alias Hits = TrackingRecHit2DSOAView
-    alias hindex_type = Hits.HIndexType
+    alias hindex_type = Self.Hits.HIndexType
 
     alias TmpTuple = VecArray[UInt32, "TmpTuple", 6]
 
     alias HitContainer = pixelTrack.HitContainer
-    alias Quality = trackQuality.Quality
+    alias Quality = pixelTrack.Quality
     alias bad = trackQuality.bad
 
-    var theOuterNeighbors: UnsafePointer[CellNeighbors]
-    var theTracks: UnsafePointer[CellTracks]
+    var theOuterNeighbors: UnsafePointer[Self.CellNeighbors]
+    var theTracks: UnsafePointer[Self.CellTracks]
 
     var theDoubletId: Int32
     var theLayerPairId: Int16
-    var theUsed: UInt16
+    var theUsed: UInt16  # tbd
 
     var theInnerZ: Float32
     var theInnerR: Float32
-    var theInnerHitId: hindex_type
-    var theOuterHitId: hindex_type
+    var theInnerHitId: Self.hindex_type
+    var theOuterHitId: Self.hindex_type
 
     fn __init__(out self):
-        self.theOuterNeighbors = UnsafePointer[CellNeighbors]()
-        self.theTracks = UnsafePointer[CellTracks]()
+        self.theOuterNeighbors = UnsafePointer[Self.CellNeighbors]()
+        self.theTracks = UnsafePointer[Self.CellTracks]()
 
         self.theDoubletId = 0
         self.theLayerPairId = 0
@@ -60,133 +60,58 @@ struct GPUCACell(Copyable, Defaultable, Movable):
         self.theInnerHitId = 0
         self.theOuterHitId = 0
 
-    @always_inline
-    fn outerNeighbors(ref self) -> ref [self.theOuterNeighbors] CellNeighbors:
-        return self.theOuterNeighbors[]
-
-    @always_inline
-    fn outerNeighbors(self: mut Self) -> mut CellNeighbors:
-        return self.theOuterNeighbors[]
-
-    @always_inline
-    fn tracks(ref self) -> ref [self.theTracks] CellTracks:
-        return self.theTracks[]
-
-    @always_inline
-    fn tracks(self: mut Self) -> mut CellTracks:
-        return self.theTracks[]
-
-    fn get_inner_hit_id(self) -> hindex_type:
-        return self.theInnerHitId
-
-    fn get_outer_hit_id(self) -> hindex_type:
-        return self.theOuterHitId
-
-    @always_inline
-    fn get_inner_x(self: read Self,hh: read Hits) -> Float32:
-        return hh.xGlobal(self.theInnerHitId.cast[Int]())
-
-    @always_inline
-    fn get_outer_x(self: read Self,hh: read Hits) -> Float32:
-        return hh.xGlobal(self.theOuterHitId.cast[Int]())
-
-    @always_inline
-    fn get_inner_y(self: read Self,hh: read Hits) -> Float32:
-        return hh.yGlobal(self.theInnerHitId.cast[Int]())
-
-    @always_inline
-    fn get_outer_y(self: read Self,hh: read Hits) -> Float32:
-        return hh.yGlobal(self.theOuterHitId.cast[Int]())
-
-    @always_inline
-    fn get_inner_z(self: read Self,hh: read Hits) -> Float32:
-        return self.theInnerZ
-
-    @always_inline
-    fn get_outer_z(self: read Self,hh: read Hits) -> Float32:
-        return hh.zGlobal(self.theOuterHitId.cast[Int]())
-
-    @always_inline
-    fn get_inner_r(self: read Self,hh: read Hits) -> Float32:
-        return self.theInnerR
-
-    @always_inline
-    fn get_outer_r(self: read Self,hh: read Hits) -> Float32:
-        return hh.rGlobal(self.theOuterHitId.cast[Int]())
-
-    @always_inline
-    fn get_inner_iphi(self: read Self,hh: read Hits):
-        return hh.iphi(self.theInnerHitId.cast[Int]())
-
-    @always_inline
-    fn get_outer_iphi(self: read Self,hh: read Hits):
-        return hh.iphi(self.theOuterHitId.cast[Int]())
-
-    @always_inline
-    fn get_inner_detIndex(self: read Self,hh: read Hits) -> Float32:
-        return hh.detectorIndex(self.theInnerHitId.cast[Int]())
-
-    @always_inline
-    fn get_outer_detIndex(self: read Self,hh: read Hits) -> Float32:
-        return hh.detectorIndex(self.theOuterHitId.cast[Int]())
-
     fn init(
         mut self,
-        mut cellNeighbors: CellNeighborsVector,
-        mut cellTracks: CellTracksVector,
-        read hh: Hits,
+        mut cellNeighbors: Self.CellNeighborsVector,
+        mut cellTracks: Self.CellTracksVector,
+        hh: Self.Hits,
         layerPairId: Int32,
         doubletId: Int32,
-        innerHitId: hindex_type,
-        outerHitId: hindex_type,
+        innerHitId: Self.hindex_type,
+        outerHitId: Self.hindex_type,
     ):
         self.theInnerHitId = innerHitId
         self.theOuterHitId = outerHitId
         self.theDoubletId = doubletId
-        self.theLayerPairId = layerPairId.cast[Int16]()
+        self.theLayerPairId = layerPairId.cast[DType.int16]()
         self.theUsed = 0
 
-        let innerIdx = innerHitId.cast[Int]()
+        var innerIdx = Int(innerHitId)
         self.theInnerZ = hh.zGlobal(innerIdx)
         self.theInnerR = hh.rGlobal(innerIdx)
 
-        self.theOuterNeighbors = UnsafePointer(to=self.cellNeighbors[0])
-        self.theTracks = UnsafePointer(to=self.cellTracks[0])
-        assert self.outerNeighbors().empty()
-        assert self.tracks().empty()
-
-    fn __moveinit__(out self, var other: Self):
-        self.theDoubletId = other.theDoubletId
-        self.theLayerPairId = other.theLayerPairId
-        self.theUsed = other.theUsed
-
-        self.theInnerZ = other.theInnerZ
-        self.theInnerR = other.theInnerR
-        self.theInnerHitId = other.theInnerHitId
-        self.theOuterHitId = other.theOuterHitId
-
-        self.theOuterNeighbors = UnsafePointer(to=self.cellNeighbors[0])
-        self.theTracks = UnsafePointer(to=self.cellTracks[0])
+        # link to default empty
+        self.theOuterNeighbors = UnsafePointer(to=cellNeighbors[0])
+        self.theTracks = UnsafePointer(to=cellTracks[0])
+        debug_assert(self.outerNeighbors().empty())
+        debug_assert(self.tracks().empty())
 
     @always_inline
     fn addOuterNeighbor(
         mut self,
         t: UInt32,
-        mut cellNeighbors: CellNeighborsVector,
+        mut cellNeighbors: Self.CellNeighborsVector,
     ) -> Int32:
+        # use smart cache
         if self.outerNeighbors().empty():
-            var i = cellNeighbors.extend()
+            var i = cellNeighbors.extend()  # maybe waisted....
             if i > 0:
                 cellNeighbors[i].reset()
+
+                @parameter
                 if is_defined["__CUDACC__"]():
-                    var zero = ptrAsInt(UnsafePointer(to=(cellNeighbors[0])).__init__())
+                    var zero = UInt64(
+                        Int(UnsafePointer(to=cellNeighbors[0]))
+                    )
                     _ = CUDACompat.atomicCAS(
-                        UnsafePointer(to=self.theOuterNeighbors).bitcast[ptrAsInt](),
+                        UnsafePointer(to=self.theOuterNeighbors).bitcast[UInt64](),
                         zero,
-                        ptrAsInt((UnsafePointer(to=cellNeighbors[i])).__init__()),
+                        UInt64(Int(UnsafePointer(to=cellNeighbors[i]))),
                     )
                 else:
-                    self.theOuterNeighbors = UnsafePointer(to=cellNeighbors[i])
+                    self.theOuterNeighbors = UnsafePointer(
+                        to=cellNeighbors[i]
+                    )
             else:
                 return -1
 
@@ -196,18 +121,20 @@ struct GPUCACell(Copyable, Defaultable, Movable):
     fn addTrack(
         mut self,
         t: UInt16,
-        mut cellTracks: CellTracksVector,
+        mut cellTracks: Self.CellTracksVector,
     ) -> Int32:
         if self.tracks().empty():
-            var i = cellTracks.extend()
+            var i = cellTracks.extend()  # maybe waisted....
             if i > 0:
                 cellTracks[i].reset()
+
+                @parameter
                 if is_defined["__CUDACC__"]():
-                    var zero = ptrAsInt(UnsafePointer(to=(cellTracks[0])).__init__())
+                    var zero = UInt64(Int(UnsafePointer(to=cellTracks[0])))
                     _ = CUDACompat.atomicCAS(
-                        UnsafePointer(to=self.theTracks).bitcast[ptrAsInt](),
+                        UnsafePointer(to=self.theTracks).bitcast[UInt64](),
                         zero,
-                        ptrAsInt((UnsafePointer(to=cellTracks[i])).__init__()),
+                        UInt64(Int(UnsafePointer(to=cellTracks[i]))),
                     )
                 else:
                     self.theTracks = UnsafePointer(to=cellTracks[i])
@@ -216,55 +143,130 @@ struct GPUCACell(Copyable, Defaultable, Movable):
 
         return self.tracks().push_back(t)
 
+    @always_inline
+    fn tracks(ref self) -> ref [self.theTracks] Self.CellTracks:
+        return self.theTracks[]
+
+    @always_inline
+    fn outerNeighbors(ref self) -> ref [self.theOuterNeighbors] Self.CellNeighbors:
+        return self.theOuterNeighbors[]
+
+    @always_inline
+    fn get_inner_x(self, hh: Self.Hits) -> Float32:
+        return hh.xGlobal(Int(self.theInnerHitId))
+
+    @always_inline
+    fn get_outer_x(self, hh: Self.Hits) -> Float32:
+        return hh.xGlobal(Int(self.theOuterHitId))
+
+    @always_inline
+    fn get_inner_y(self, hh: Self.Hits) -> Float32:
+        return hh.yGlobal(Int(self.theInnerHitId))
+
+    @always_inline
+    fn get_outer_y(self, hh: Self.Hits) -> Float32:
+        return hh.yGlobal(Int(self.theOuterHitId))
+
+    @always_inline
+    fn get_inner_z(self, hh: Self.Hits) -> Float32:
+        return self.theInnerZ
+
+    # { return hh.zGlobal(theInnerHitId); } # { return theInnerZ; }
+    @always_inline
+    fn get_outer_z(self, hh: Self.Hits) -> Float32:
+        return hh.zGlobal(Int(self.theOuterHitId))
+
+    @always_inline
+    fn get_inner_r(self, hh: Self.Hits) -> Float32:
+        return self.theInnerR
+
+    # { return hh.rGlobal(theInnerHitId); } # { return theInnerR; }
+    @always_inline
+    fn get_outer_r(self, hh: Self.Hits) -> Float32:
+        return hh.rGlobal(Int(self.theOuterHitId))
+
+    @always_inline
+    fn get_inner_iphi(self, hh: Self.Hits) -> Int16:
+        return hh.iphi(Int(self.theInnerHitId))
+
+    @always_inline
+    fn get_outer_iphi(self, hh: Self.Hits) -> Int16:
+        return hh.iphi(Int(self.theOuterHitId))
+
+    @always_inline
+    fn get_inner_detIndex(self, hh: Self.Hits) -> Float32:
+        return Float32(hh.detectorIndex(Int(self.theInnerHitId)))
+
+    @always_inline
+    fn get_outer_detIndex(self, hh: Self.Hits) -> Float32:
+        return Float32(hh.detectorIndex(Int(self.theOuterHitId)))
+
+    fn get_inner_hit_id(self) -> Self.hindex_type:
+        return self.theInnerHitId
+
+    fn get_outer_hit_id(self) -> Self.hindex_type:
+        return self.theOuterHitId
 
     fn print_cell(self):
         print(
-            "printing cell: {}, on layerPair: {}, innerHitId: {}, outerHitId: {}\n"
-                .format(
-                    self.theDoubletId,
-                    self.theLayerPairId,
-                    self.theInnerHitId,
-                    self.theOuterHitId
-                )
+            "printing cell: ",
+            self.theDoubletId,
+            ", on layerPair: ",
+            self.theLayerPairId,
+            ", innerHitId: ",
+            self.theInnerHitId,
+            ", outerHitId: ",
+            self.theOuterHitId,
         )
 
-    fn check_alignment(self , hh : Hits ,
-                        otherCell : GPUCACell , 
-                        ptmin: Float32,
-                        hardCurvCut: Float32,
-                        CAThetaCutBarrel: Float32,
-                        CAThetaCutForward: Float32,
-                        dcaCutInnerTriplet: Float32,
-                        dcaCutOuterTriplet: Float32) -> Bool :
-        comptime last_bpix1_detIndex : UInt32 = 96
-        comptime last_barrel_detIndex :UInt32 = 1184
-        var ri =  get_inner_r(hh)
-        var zi = get_inner_z(hh)
+    fn check_alignment(
+        self,
+        hh: Self.Hits,
+        otherCell: GPUCACell,
+        ptmin: Float32,
+        hardCurvCut: Float32,
+        CAThetaCutBarrel: Float32,
+        CAThetaCutForward: Float32,
+        dcaCutInnerTriplet: Float32,
+        dcaCutOuterTriplet: Float32,
+    ) -> Bool:
+        # detIndex of the layerStart for the Phase1 Pixel Detector:
+        # [BPX1, BPX2, BPX3, BPX4,  FP1,  FP2,  FP3,  FN1,  FN2,  FN3, LAST_VALID]
+        # [   0,   96,  320,  672, 1184, 1296, 1408, 1520, 1632, 1744,       1856]
+        alias last_bpix1_detIndex: UInt32 = 96
+        alias last_barrel_detIndex: UInt32 = 1184
+        var ri = self.get_inner_r(hh)
+        var zi = self.get_inner_z(hh)
 
-        var ro = get_outer_r(hh)
-        var zo = get_outer_z(hh)
+        var ro = self.get_outer_r(hh)
+        var zo = self.get_outer_z(hh)
 
         var r1 = otherCell.get_inner_r(hh)
         var z1 = otherCell.get_inner_z(hh)
-        var isBarrel = otherCell.get_outer_detIndex(hh) < last_barrel_detIndex
+        var isBarrel = otherCell.get_outer_detIndex(hh) < Float32(
+            last_barrel_detIndex
+        )
 
-        let aligned : Bool = areAlignedRZ(r1 ,
-                                    z1 , 
-                                    ri ,
-                                    zi ,
-                                    ro ,
-                                    zo ,
-                                    ptmin ,
-                                    CAThetaCutBarrel if isBarrel else CAThetaCutForward)
+        var aligned: Bool = Self.areAlignedRZ(
+            r1,
+            z1,
+            ri,
+            zi,
+            ro,
+            zo,
+            ptmin,
+            CAThetaCutBarrel if isBarrel else CAThetaCutForward,
+        )  # 2.f*thetaCut); # FIXME tune cuts
 
-        return aligned and dcaCut(
-                    hh,
-                    otherCell,
-                    dcaCutInnerTriplet if otherCell.get_inner_detIndex(hh) < last_bpix1_detIndex
-                    else dcaCutOuterTriplet,
-                    hardCurvCut
-                )
+        return aligned and self.dcaCut(
+            hh,
+            otherCell,
+            dcaCutInnerTriplet if otherCell.get_inner_detIndex(hh)
+            < Float32(last_bpix1_detIndex) else dcaCutOuterTriplet,
+            hardCurvCut,
+        )  # FIXME tune cuts
 
+    @staticmethod
     fn areAlignedRZ(
         r1: Float32,
         z1: Float32,
@@ -273,48 +275,51 @@ struct GPUCACell(Copyable, Defaultable, Movable):
         ro: Float32,
         zo: Float32,
         ptmin: Float32,
-        thetaCut: Float32
+        thetaCut: Float32,
     ) -> Bool:
-        # abs and sqrt come from builtin math and math.sqrt [[Builtin math](<https://docs.modular.com/mojo/std/builtin/math/>); [sqrt](<https://docs.modular.com/mojo/std/math/math/sqrt/>)]
-        let radius_diff: Float32 = abs(r1 - ro)
-        let dz_13: Float32 = z1 - zo
-        let distance_13_squared: Float32 = radius_diff * radius_diff + dz_13 * dz_13
-
-        let pMin: Float32 = ptmin * math.sqrt(distance_13_squared)
-
-        let tan_12_13_half_mul_distance_13_squared: Float32 = abs(
-            z1 * (ri - ro) +
-            zi * (ro - r1) +
-            zo * (r1 - ri)
+        var radius_diff = abs(r1 - ro)
+        var distance_13_squared = radius_diff * radius_diff + (z1 - zo) * (
+            z1 - zo
         )
 
-        return tan_12_13_half_mul_distance_13_squared * pMin \
+        var pMin = ptmin * sqrt(
+            distance_13_squared
+        )  # this needs to be divided by radius_diff later
+
+        var tan_12_13_half_mul_distance_13_squared = abs(
+            z1 * (ri - ro) + zi * (ro - r1) + zo * (r1 - ri)
+        )
+        return (
+            tan_12_13_half_mul_distance_13_squared * pMin
             <= thetaCut * distance_13_squared * radius_diff
+        )
 
     fn dcaCut(
         self,
-        hh: Hits,
+        hh: Self.Hits,
         otherCell: GPUCACell,
         region_origin_radius_plus_tolerance: Float32,
-        maxCurv: Float32
+        maxCurv: Float32,
     ) -> Bool:
-        let x1 = otherCell.get_inner_x(hh)
-        let y1 = otherCell.get_inner_y(hh)
+        var x1 = otherCell.get_inner_x(hh)
+        var y1 = otherCell.get_inner_y(hh)
 
-        let x2 = self.get_inner_x(hh)
-        let y2 = self.get_inner_y(hh)
+        var x2 = self.get_inner_x(hh)
+        var y2 = self.get_inner_y(hh)
 
-        let x3 = self.get_outer_x(hh)
-        let y3 = self.get_outer_y(hh)
+        var x3 = self.get_outer_x(hh)
+        var y3 = self.get_outer_y(hh)
 
-        let eq = CircleEq[Float32](x1, y1, x2, y2, x3, y3)
+        var eq = CircleEq[DType.float32](x1, y1, x2, y2, x3, y3)
 
         if eq.curvature() > maxCurv:
             return False
 
-        return abs(eq.dca0()) < region_origin_radius_plus_tolerance * abs(eq.curvature())
+        return abs(eq.dca0()) < region_origin_radius_plus_tolerance * abs(
+            eq.curvature()
+        )
 
-
+    @staticmethod
     fn dcaCutH(
         x1: Float32,
         y1: Float32,
@@ -323,112 +328,117 @@ struct GPUCACell(Copyable, Defaultable, Movable):
         x3: Float32,
         y3: Float32,
         region_origin_radius_plus_tolerance: Float32,
-        maxCurv: Float32
+        maxCurv: Float32,
     ) -> Bool:
-
-        var eq = CircleEq[Float32](x1, y1, x2, y2, x3, y3)
+        var eq = CircleEq[DType.float32](x1, y1, x2, y2, x3, y3)
 
         if eq.curvature() > maxCurv:
             return False
 
-        return abs(eq.dca0()) < region_origin_radius_plus_tolerance * abs(eq.curvature())
+        return abs(eq.dca0()) < region_origin_radius_plus_tolerance * abs(
+            eq.curvature()
+        )
 
-    fn hole0(
-        self,
-        hh: Hits,
-        innerCell: GPUCACell
-    ) -> Bool:
-        comptime max_ladder_bpx0: UInt32 = 12
-        comptime first_ladder_bpx0: UInt32 = 0
-        comptime module_length: Float32 = 6.7
-        comptime module_tolerance: Float32 = 0.4
-        comptime max_ushort: Int = 65535
+    fn hole0(self, hh: Self.Hits, innerCell: GPUCACell) -> Bool:
+        alias max_ladder_bpx0: UInt32 = 12
+        alias first_ladder_bpx0: UInt32 = 0
+        alias module_length: Float32 = 6.7
+        alias module_tolerance: Float32 = 0.4  # projection to cylinder is inaccurate on BPIX1
+        alias max_ushort: Int = 65535
 
-        var p : Int = innerCell.get_inner_iphi(hh).cast[Int]()
+        var p: Int = Int(innerCell.get_inner_iphi(hh))
         if p < 0:
             p += max_ushort
-        p = (max_ladder_bpx0 * p) / max_ushort
-        p = p % max_ladder_bpx0
-        let il = first_ladder_bpx0 + p
-        let avg = hh.averageGeometry()
-        let r0 = avg.ladderR[il]
-        let ri = innerCell.get_inner_r(hh)
-        let zi = innerCell.get_inner_z(hh)
-        let ro = self.get_outer_r(hh)
-        let zo = self.get_outer_z(hh)
-        let z0 = zi + (r0 - ri) * (zo - zi) / (ro - ri)
-        let z_in_ladder = abs(z0 - avg.ladderZ[il])
-        let z_in_module = z_in_ladder - module_length * Float32(
+        p = (Int(max_ladder_bpx0) * p) // max_ushort
+        p = p % Int(max_ladder_bpx0)
+        var il = Int(first_ladder_bpx0) + p
+        ref avg = hh.averageGeometry()
+        var r0 = avg.ladderR[il]
+        var ri = innerCell.get_inner_r(hh)
+        var zi = innerCell.get_inner_z(hh)
+        var ro = self.get_outer_r(hh)
+        var zo = self.get_outer_z(hh)
+        var z0 = zi + (r0 - ri) * (zo - zi) / (ro - ri)
+        var z_in_ladder = abs(z0 - avg.ladderZ[il])
+        var z_in_module = z_in_ladder - module_length * Float32(
             Int(z_in_ladder / module_length)
         )
-        let gap = z_in_module < module_tolerance or \
-            z_in_module > (module_length - module_tolerance)
+        var gap = z_in_module < module_tolerance or z_in_module > (
+            module_length - module_tolerance
+        )
         return gap
 
     @always_inline
-    fn hole4(
-        self,
-        hh: Hits,
-        innerCell: GPUCACell
-    ) -> Bool:
-        comptime max_ladder_bpx4: UInt32 = 64
-        comptime first_ladder_bpx4: UInt32 = 84
-        comptime module_length: Float32 = 6.7
-        comptime module_tolerance: Float32 = 0.2
-        comptime max_ushort: Int = 65535
+    fn hole4(self, hh: Self.Hits, innerCell: GPUCACell) -> Bool:
+        alias max_ladder_bpx4: UInt32 = 64
+        alias first_ladder_bpx4: UInt32 = 84
+        alias module_length: Float32 = 6.7
+        alias module_tolerance: Float32 = 0.2
+        alias max_ushort: Int = 65535
 
-        var p : Int = self.get_outer_iphi(hh).cast[Int]()
+        var p: Int = Int(self.get_outer_iphi(hh))
         if p < 0:
             p += max_ushort
-        p = (max_ladder_bpx4 * p) / max_ushort
-        p = p % max_ladder_bpx4
-        let il = first_ladder_bpx4 + p
-        let avg = hh.averageGeometry()
-        let r4 = avg.ladderR[il]
-        let ri = innerCell.get_inner_r(hh)
-        let zi = innerCell.get_inner_z(hh)
-        let ro = self.get_outer_r(hh)
-        let zo = self.get_outer_z(hh)
-        let z4 = zo + (r4 - ro) * (zo - zi) / (ro - ri)
-        let z_in_ladder = abs(z4 - avg.ladderZ[il])
-        let z_in_module = z_in_ladder - module_length * Float32(
+        p = (Int(max_ladder_bpx4) * p) // max_ushort
+        p = p % Int(max_ladder_bpx4)
+        var il = Int(first_ladder_bpx4) + p
+        ref avg = hh.averageGeometry()
+        var r4 = avg.ladderR[il]
+        var ri = innerCell.get_inner_r(hh)
+        var zi = innerCell.get_inner_z(hh)
+        var ro = self.get_outer_r(hh)
+        var zo = self.get_outer_z(hh)
+        var z4 = zo + (r4 - ro) * (zo - zi) / (ro - ri)
+        var z_in_ladder = abs(z4 - avg.ladderZ[il])
+        var z_in_module = z_in_ladder - module_length * Float32(
             Int(z_in_ladder / module_length)
         )
-        let gap = z_in_module < module_tolerance or \
-            z_in_module > (module_length - module_tolerance)
-        let holeP = z4 > avg.ladderMaxZ[il] and z4 < avg.endCapZ[0]
-        let holeN = z4 < avg.ladderMinZ[il] and z4 > avg.endCapZ[1]
+        var gap = z_in_module < module_tolerance or z_in_module > (
+            module_length - module_tolerance
+        )
+        var holeP = z4 > avg.ladderMaxZ[il] and z4 < avg.endCapZ[0]
+        var holeN = z4 < avg.ladderMinZ[il] and z4 > avg.endCapZ[1]
         return gap or holeP or holeN
 
-    fn find_ntuplets[DEPTH: Int](
+    # trying to free the track building process from hardcoded layers, leaving
+    # the visit of the graph based on the neighborhood connections between cells.
+    fn find_ntuplets[
+        DEPTH: Int
+    ](
         self,
-        hh: Hits,
+        hh: Self.Hits,
         cells: UnsafePointer[GPUCACell],
-        mut cellTracks: CellTracksVector,
-        mut foundNtuplets: HitContainer,
+        mut cellTracks: Self.CellTracksVector,
+        mut foundNtuplets: Self.HitContainer,
         mut apc: AtomicPairCounter,
-        quality: UnsafePointer[pixelTrack.Quality],
-        mut tmpNtuplet: TmpTuple,
+        quality: UnsafePointer[Self.Quality],
+        mut tmpNtuplet: Self.TmpTuple,
         minHitsPerNtuplet: UInt32,
-        startAt0: Bool
+        startAt0: Bool,
     ):
+        # the building process for a track ends if:
+        # it has no right neighbor
+        # it has no compatible neighbor
+        # the ntuplets is then saved if the number of hits it contains is greater
+        # than a threshold
+
         @parameter
         if DEPTH == 0:
             print("ERROR: GPUCACell::find_ntuplets reached full depth!")
-            assert False
+            debug_assert(False)
             return
-    
-        var doubletId = self.theDoubletId.cast[UInt32]()
-        _ = tmpNtuplet.push_back_unsafe(doubletId)
-        assert len(tmpNtuplet) <= 4
-    
+
+        _ = tmpNtuplet.push_back_unsafe(self.theDoubletId.cast[DType.uint32]())
+        debug_assert(len(tmpNtuplet) <= 4)
+
         var last = True
-        let nNeighbors = len(self.outerNeighbors())
+        var nNeighbors = len(self.outerNeighbors())
         var j: Int = 0
         while j < nNeighbors:
-            let otherCell = self.outerNeighbors()[j.cast[Int32]()]
-            let otherIdx = otherCell.cast[Int]()
+            var otherCell = self.outerNeighbors()[Int32(j)]
+            var otherIdx = Int(otherCell)
             if (cells + otherIdx)[].theDoubletId < 0:
+                # killed by earlyFishbone
                 j += 1
                 continue
             last = False
@@ -444,44 +454,51 @@ struct GPUCACell(Copyable, Defaultable, Movable):
                 startAt0,
             )
             j += 1
-    
-        if last:
+
+        if last:  # if long enough save...
             if UInt32(len(tmpNtuplet)) >= minHitsPerNtuplet - 1:
                 var accept = True
+
                 @parameter
                 if is_defined["ONLY_TRIPLETS_IN_HOLE"]():
-                    let firstCell = tmpNtuplet[0]
-                    let inner = (cells + firstCell.cast[Int]())[]
-                    accept = len(tmpNtuplet) >= 3 or \
-                        (startAt0 and self.hole4(hh, inner)) or \
-                        (not startAt0 and self.hole0(hh, inner))
+                    # triplets accepted only pointing to the hole
+                    var firstCell = tmpNtuplet[0]
+                    var inner = (cells + Int(firstCell))[]
+                    accept = (
+                        len(tmpNtuplet) >= 3
+                        or (startAt0 and self.hole4(hh, inner))
+                        or ((not startAt0) and self.hole0(hh, inner))
+                    )
                 if accept:
-                    var hits = InlineArray[GPUCACell.hindex_type, 6](fill=0)
+                    var hits = InlineArray[Self.hindex_type, 6](fill=0)
                     var nh: UInt32 = 0
-                    let tupleSize = len(tmpNtuplet)
+                    var tupleSize = len(tmpNtuplet)
                     var i: Int = 0
                     while i < tupleSize:
-                        let cellIdx = tmpNtuplet[i.cast[Int32]()]
-                        hits[nh.cast[Int]()] = (cells + cellIdx.cast[Int]())[].theInnerHitId
+                        var cellIdx = tmpNtuplet[Int32(i)]
+                        hits[Int(nh)] = (cells + Int(cellIdx))[].theInnerHitId
                         nh += 1
                         i += 1
-                    hits[nh.cast[Int]()] = self.theOuterHitId
-                    let it = foundNtuplets.bulkFill(
+                    hits[Int(nh)] = self.theOuterHitId
+                    var it = foundNtuplets.bulkFill(
                         apc,
                         hits.unsafe_ptr(),
                         UInt32(tupleSize + 1),
                     )
-                    if it >= 0:
-                        let tid = it.cast[UInt16]()
+                    if it >= 0:  # if negative is overflow....
                         i = 0
                         while i < tupleSize:
-                            let cellIdx = tmpNtuplet[i.cast[Int32]()]
-                            (cells + cellIdx.cast[Int]())[].addTrack(
-                                tid,
-                                cellTracks,
+                            var cellIdx = tmpNtuplet[Int32(i)]
+                            _ = (cells + Int(cellIdx))[].addTrack(
+                                UInt16(it), cellTracks
                             )
                             i += 1
-                        quality[it] = trackQuality.bad
-    
+                        quality[Int(it)] = Self.bad  # initialize to bad
+
         _ = tmpNtuplet.pop_back()
-        assert len(tmpNtuplet) < 4
+        debug_assert(len(tmpNtuplet) < 4)
+
+    @always_inline
+    @staticmethod
+    fn dtype() -> String:
+        return "GPUCACell"
