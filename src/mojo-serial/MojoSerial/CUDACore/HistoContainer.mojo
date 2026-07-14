@@ -82,13 +82,14 @@ fn finalizeBulk(
 
 
 fn forEachInBins[
-    V: DType
-](
-    ref hist: HistoContainer[V, *_],
-    value: Scalar[V],
-    n: Int32,
-    func: fn (Scalar[hist.IndexType]),
-):
+    V: DType,
+    NBINS: UInt32,
+    SIZE: UInt32,
+    S: UInt32,
+    I: DType,
+    NHISTS: UInt32,
+    func: fn (Scalar[I]) capturing -> None,
+](ref hist: HistoContainer[V, NBINS, SIZE, S, I, NHISTS], value: Scalar[V], n: Int32):
     """Iterate over N bins left and right of the one containing "v"."""
     var bs = hist.bin(value).cast[DType.int32]()
     var be = min(hist.nbins().cast[DType.int32]() - 1, bs + n)
@@ -102,12 +103,17 @@ fn forEachInBins[
 
 
 fn forEachInWindow[
-    V: DType
+    V: DType,
+    NBINS: UInt32,
+    SIZE: UInt32,
+    S: UInt32,
+    I: DType,
+    NHISTS: UInt32,
+    func: fn (Scalar[I]) capturing -> None,
 ](
-    ref hist: HistoContainer[V, *_],
+    ref hist: HistoContainer[V, NBINS, SIZE, S, I, NHISTS],
     wmin: Scalar[V],
     wmax: Scalar[V],
-    func: fn (Scalar[hist.IndexType]),
 ):
     """Iterate over bins containing all values in window wmin, wmax."""
     var bs = hist.bin(wmin)

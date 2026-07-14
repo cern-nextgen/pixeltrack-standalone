@@ -14,8 +14,12 @@ struct CUDACompat:
         " regular operations since we are not in a CUDA environment."
     )
     fn atomicCAS[
-        T1: Copyable & EqualityComparable, //
-    ](address: UnsafePointer[T1, mut=True], compare: T1, val: T1) -> T1:
+        T1: DType, //
+    ](
+        address: UnsafePointer[Scalar[T1], mut=True],
+        compare: Scalar[T1],
+        val: Scalar[T1],
+    ) -> Scalar[T1]:
         var old = address[]
         address[] = val if old == compare else old
         return old
@@ -63,8 +67,8 @@ struct CUDACompat:
         " regular operations since we are not in a CUDA environment."
     )
     fn atomicMin[
-        T1: Copyable & Comparable, //
-    ](a: UnsafePointer[T1, mut=True], b: T1) -> T1:
+        T1: DType, //
+    ](a: UnsafePointer[Scalar[T1], mut=True], b: Scalar[T1]) -> Scalar[T1]:
         var ret = a[]
         a[] = min(a[], b)
         return ret
@@ -75,8 +79,8 @@ struct CUDACompat:
         " regular operations since we are not in a CUDA environment."
     )
     fn atomicMax[
-        T1: Copyable & Comparable, //
-    ](a: UnsafePointer[T1, mut=True], b: T1) -> T1:
+        T1: DType, //
+    ](a: UnsafePointer[Scalar[T1], mut=True], b: Scalar[T1]) -> Scalar[T1]:
         var ret = a[]
         a[] = max(a[], b)
         return ret
